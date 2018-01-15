@@ -18,7 +18,7 @@ class Dnet:
 
 		self._build_net()
 
-	def _build_net(self, h1_size=100, h2_size=100, lr=1e-3):
+	def _build_net(self, h1_size=100, h2_size=100, lr=5e-4):
 		with tf.variable_scope(self.name):
 			self._traj = tf.placeholder(tf.float32, [None, self.input_size])
 			self._trajE = tf.placeholder(tf.float32, [None, self.input_size])
@@ -60,7 +60,7 @@ class PInet:
 
 		self._build_net()
 
-	def _build_net(self, h1_size=100, h2_size=100, lr=1e-3, lamb=1e-3):
+	def _build_net(self, h1_size=100, h2_size=100, lr=5e-4, lamb=0):
 		with tf.variable_scope(self.name):
 			self._state = tf.placeholder(tf.float32, [None, self.input_size])
 			self._action = tf.placeholder(tf.float32, [None, self.output_size])
@@ -73,19 +73,20 @@ class PInet:
 			W3 = tf.get_variable("W3", shape=[h2_size, self.output_size], initializer=tf.contrib.layers.xavier_initializer())
 			b3 = tf.get_variable("b3", shape=[self.output_size], initializer=tf.constant_initializer(0.0))
 			self._PI = tf.nn.softmax(tf.matmul(layer2, W3) + b3)
-			self._D = tf.placeholder(tf.float32, [None, 1])
+			self._Q = tf.placeholder(tf.float32, [None, 1])
 
 		self._pa = tf.reduce_max(tf.multiply(self._PI, self._action))
-		self._lossPI = tf.reduce_mean(tf.log(self._pa)*tf.log(self._D)-lamb*tf.log(self._pa))
-		self._trainPI = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(self._lossPI)
+		self._lossPI = tf.reduce_mean(tf.log(self._pa*self._Q))-lamb*tf.reduce_mean(-tf.log(self._pa))
+		# self._trainPI = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(self._lossPI)
+		self._trainPI = tf.train.AdamOptimizer(learning_rate=lr).minimize(self._lossPI)
 
 	def policyAt(self, state):
 		x = np.reshape(state, [1, self.input_size])
 		return self.session.run(self._PI, feed_dict={self._state: x})
 		
 
-	def update(self, state, action_mat, D):
-		return self.session.run([self._lossPI, self._trainPI], feed_dict={self._state:state, self._action:action_mat, self._D:D})
+	def update(self, state, action_mat, Q):
+		return self.session.run([self._lossPI, self._trainPI], feed_dict={self._state:state, self._action:action_mat, self._Q:Q})
 
 
 def main():
@@ -96,7 +97,7 @@ def main():
 	input_size_P = env.observation_space.shape[0]
 	output_size_P = env.action_space.n
 
-	max_iter = 5
+	max_iter = 10
 	max_episode = 100
 
 	# load expert data that exceeds score of 200 (trained using DQN)
@@ -122,7 +123,7 @@ def main():
 				traj = np.empty(0).reshape(0, input_size_D)
 				state_stack = np.empty(0).reshape(0, input_size_P)
 				action_stack = np.empty(0).reshape(0, output_size_P)
-				D_stack = np.empty(0).reshape(0, 1)
+				Q_stack = np.empty(0).reshape(0, 1)
 
 				step_counter = 0
 				while True:
@@ -139,14 +140,22 @@ def main():
 
 					if done or step_counter > 300:
 						print("Score of {}".format(len(traj)))
+						# if(len(traj)<=10):
+						# 	print(action_stack)
+
 						# discriminator update
 						discriminator.update(traj, tr_E)
 						# using updated discriminator
 						D_SUM = 0
-						for i in range(traj.shape[0]):
-							D_SUM += discriminator.discriminate(traj[i], 0)
+						D_ct = 0
+						for j in range(traj.shape[0]+1,0,-1):
+							D_ct += 1
+							D_SUM += np.log(discriminator.discriminate(traj[j-2], 0))
+							Q = D_SUM/D_ct
+							Q_stack = np.vstack([Q_stack, Q])
+						Q_stack = np.flipud(Q_stack)
 						# policy.update
-						policy.update(state_stack, action_stack, D_SUM)
+						policy.update(state_stack, action_stack, Q_stack)
 						break
 					
 
