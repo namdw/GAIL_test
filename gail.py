@@ -18,7 +18,7 @@ class Dnet:
 
 		self._build_net()
 
-	def _build_net(self, h1_size=100, h2_size=100, lr=5e-3):
+	def _build_net(self, h1_size=100, h2_size=100, lr=1e-3):
 		with tf.variable_scope(self.name):
 			self._traj = tf.placeholder(tf.float32, [None, self.input_size])
 			self._trajE = tf.placeholder(tf.float32, [None, self.input_size])
@@ -60,7 +60,7 @@ class PInet:
 
 		self._build_net()
 
-	def _build_net(self, h1_size=100, h2_size=100, lr=5e-3, lamb=1e-3):
+	def _build_net(self, h1_size=100, h2_size=100, lr=1e-3, lamb=0):
 		with tf.variable_scope(self.name):
 			self._state = tf.placeholder(tf.float32, [None, self.input_size])
 			self._action = tf.placeholder(tf.float32, [None, self.output_size])
@@ -76,7 +76,7 @@ class PInet:
 			self._Q = tf.placeholder(tf.float32, [None, 1])
 
 		self._pa = tf.reduce_max(tf.multiply(self._PI, self._action))
-		self._lossPI = -(tf.reduce_mean(tf.log(self._pa*self._Q))-lamb*tf.reduce_mean(-tf.log(self._pa)))
+		self._lossPI = -(tf.reduce_mean(tf.log(self._pa*self._Q))-lamb*tf.reduce_sum(-self._pa*tf.log(self._pa)))
 		# self._trainPI = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(self._lossPI)
 		self._trainPI = tf.train.AdamOptimizer(learning_rate=lr).minimize(self._lossPI)
 
@@ -99,7 +99,7 @@ def main():
 	output_size_P = env.action_space.n
 
 	max_iter = 10
-	max_episode = 100
+	max_episode = 300
 
 	# load expert data that exceeds score of 200 (trained using DQN)
 	Expert_pool = []
@@ -129,8 +129,9 @@ def main():
 				step_counter = 0
 				while True:
 					step_counter += 1
-					env.render()
+					# env.render()
 					action_prob = policy.policyAt(state)[0]
+					# print(action_prob)
 					a = [1, 0] if(action_prob[0] > action_prob[1]) else [0, 1]
 					
 					traj = np.vstack([traj, np.concatenate((state,a))])
