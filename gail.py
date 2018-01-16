@@ -18,7 +18,7 @@ class Dnet:
 
 		self._build_net()
 
-	def _build_net(self, h1_size=100, h2_size=100, lr=5e-4):
+	def _build_net(self, h1_size=100, h2_size=100, lr=5e-3):
 		with tf.variable_scope(self.name):
 			self._traj = tf.placeholder(tf.float32, [None, self.input_size])
 			self._trajE = tf.placeholder(tf.float32, [None, self.input_size])
@@ -35,7 +35,7 @@ class Dnet:
 			self._D = tf.nn.sigmoid(tf.matmul(layer2, W3) + b3)
 			self._DE = tf.nn.sigmoid(tf.matmul(layer2E, W3) + b3)
 		
-		self._lossD = tf.reduce_mean(tf.log(self._D))+tf.reduce_mean(tf.log(1-self._DE))
+		self._lossD = -(tf.reduce_mean(tf.log(self._D))+tf.reduce_mean(tf.log(1-self._DE)))
 		self._trainD = tf.train.AdamOptimizer(learning_rate=lr).minimize(self._lossD)
 
 	def discriminate(self, state_action, expt):
@@ -60,7 +60,7 @@ class PInet:
 
 		self._build_net()
 
-	def _build_net(self, h1_size=100, h2_size=100, lr=5e-4, lamb=0):
+	def _build_net(self, h1_size=100, h2_size=100, lr=5e-3, lamb=1e-3):
 		with tf.variable_scope(self.name):
 			self._state = tf.placeholder(tf.float32, [None, self.input_size])
 			self._action = tf.placeholder(tf.float32, [None, self.output_size])
@@ -76,7 +76,7 @@ class PInet:
 			self._Q = tf.placeholder(tf.float32, [None, 1])
 
 		self._pa = tf.reduce_max(tf.multiply(self._PI, self._action))
-		self._lossPI = tf.reduce_mean(tf.log(self._pa*self._Q))-lamb*tf.reduce_mean(-tf.log(self._pa))
+		self._lossPI = -(tf.reduce_mean(tf.log(self._pa*self._Q))-lamb*tf.reduce_mean(-tf.log(self._pa)))
 		# self._trainPI = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(self._lossPI)
 		self._trainPI = tf.train.AdamOptimizer(learning_rate=lr).minimize(self._lossPI)
 
@@ -90,6 +90,7 @@ class PInet:
 
 
 def main():
+
 	env = gym.make('CartPole-v0')
 	
 	input_size_D = env.observation_space.shape[0] + env.action_space.n
@@ -145,7 +146,7 @@ def main():
 
 						# discriminator update
 						discriminator.update(traj, tr_E)
-						# using updated discriminator
+						# using updated discriminator, calculate the Q value
 						D_SUM = 0
 						D_ct = 0
 						for j in range(traj.shape[0]+1,0,-1):
