@@ -6,7 +6,7 @@
 import numpy as np
 import tensorflow as tf 
 import matplotlib.pyplot as plt 
-from collections import deque
+
 import gym
 
 class Dnet:
@@ -76,8 +76,8 @@ class PInet:
 			self._Q = tf.placeholder(tf.float32, [None, 1])
 
 		self._pa = tf.reduce_max(tf.multiply(self._PI, self._action))
+
 		self._lossPI = -(tf.reduce_mean(tf.log(self._pa*self._Q))-lamb*tf.reduce_sum(-self._pa*tf.log(self._pa)))
-		# self._trainPI = tf.train.GradientDescentOptimizer(learning_rate=lr).minimize(self._lossPI)
 		self._trainPI = tf.train.AdamOptimizer(learning_rate=lr).minimize(self._lossPI)
 
 	def policyAt(self, state):
@@ -98,8 +98,8 @@ def main():
 	input_size_P = env.observation_space.shape[0]
 	output_size_P = env.action_space.n
 
-	max_iter = 10
-	max_episode = 300
+	max_iter = 5
+	max_episode = 100
 
 	# load expert data that exceeds score of 200 (trained using DQN)
 	Expert_pool = []
@@ -129,7 +129,7 @@ def main():
 				step_counter = 0
 				while True:
 					step_counter += 1
-					# env.render()
+					env.render()
 					action_prob = policy.policyAt(state)[0]
 					# print(action_prob)
 					a = [1, 0] if(action_prob[0] > action_prob[1]) else [0, 1]
