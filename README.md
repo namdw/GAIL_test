@@ -1,7 +1,7 @@
 # GAIL_test
-This is my simple implementation of Generative Adversarial Imitation Learning by Ho et al. 
+This is my simple implementation of Generative Adversarial Imitation Learning by Ho et al.
 
-I do not hold any right to the algorithm itself. 
+I do not hold any right to any part of the algorithm itself. 
 
 This is programmed using python 3.5 and Tensorflow. 
 
